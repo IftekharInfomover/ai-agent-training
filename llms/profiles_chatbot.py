@@ -93,9 +93,16 @@ class ChatBot:
 
 
     def run(self):
+        print("Chatbot started. Type 'exit' to quit.")
         while True:
-            self.get_user_input()
-            self.send_request()
+            message = self.get_user_input()
+            if message and message["content"].lower() in ["exit", "quit"]:
+                print("Goodbye!")
+                break
+            if message:  # Only send request if input was valid
+                self.send_request()
+            # self.get_user_input()
+            # self.send_request()
 
 
 if __name__ == "__main__":
