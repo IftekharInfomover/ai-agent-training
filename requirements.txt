@@ -5,3 +5,6 @@ google
 openai
 google-genai
 pymongo
+langchain
+langchain-core
+langchain-mistralai
