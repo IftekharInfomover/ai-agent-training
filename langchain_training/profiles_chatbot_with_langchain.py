@@ -1,4 +1,5 @@
-from mistralai import Mistral
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
@@ -6,12 +7,17 @@ from pymongo import MongoClient
 load_dotenv()
 
 class ChatBot:
-    def __init__(self, _api_key, model,max_history=6 ):
+    def __init__(self, _api_key, model, max_history=6):
         self.api_key = _api_key
-        self.model = model
+        self.model_name = model  # Store model name instead of client
         self.conversation_history = []
         self.max_history = max_history
-        self.mistral_client = Mistral(api_key = api_key)
+        # Initialize LangChain Mistral model
+        self.model = init_chat_model(
+            model=model,
+            model_provider="mistralai",
+            api_key=self.api_key
+        )
         self.db_client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
         self.initialize_context()
 
@@ -48,59 +54,45 @@ class ChatBot:
                     )
                     profiles_context += f"- {profile_str}\n"
                 profiles_context += "\nNote: Only basic fields are included for each profile."
-            system_message = {
-                "role": "system",
-                "content": profiles_context
-            }
+            system_message = SystemMessage(content=profiles_context)
             self.conversation_history.append(system_message)
             print(f"System message added with {len(profiles)} profiles")
         except Exception as e:
             print(f"Error fetching profiles from MongoDB: {e}")
-            system_message = {
-                "role": "system",
-                "content": "Unable to load profiles due to a database error."
-            }
+            system_message = SystemMessage(content="Unable to load profiles due to a database error.")
             self.conversation_history.append(system_message)
         finally:
             self.db_client.close()
 
     def get_user_input(self):
-        user_input= input("\nYou: ")
-        user_message = {
-            "role": "user",
-            "content": user_input
-        }
+        user_input = input("\nYou: ")
+        user_message = HumanMessage(content=user_input)
         self.conversation_history.append(user_message)
-        non_system_messages = [msg for msg in self.conversation_history if msg["role"] != "system"]
+        # Filter non-system messages for history trimming
+        non_system_messages = [msg for msg in self.conversation_history if not isinstance(msg, SystemMessage)]
         if len(non_system_messages) > self.max_history:
-            system_message = self.conversation_history[0] if self.conversation_history[0]["role"] == "system" else None
-            trimmed_history = [msg for msg in self.conversation_history if msg["role"] != "system"][-self.max_history:]
+            system_message = self.conversation_history[0] if isinstance(self.conversation_history[0], SystemMessage) else None
+            trimmed_history = [msg for msg in self.conversation_history if not isinstance(msg, SystemMessage)][-self.max_history:]
             self.conversation_history = ([system_message] if system_message else []) + trimmed_history
         return user_message
 
     def send_request(self):
-        stream_response = self.mistral_client.chat.stream(
-            model = self.model,
-            messages=self.conversation_history
-        )
+        # Use LangChain's streaming capability
         buffer = ""
-        for chunk in stream_response:
-            content = chunk.data.choices[0].delta.content
+        for chunk in self.model.stream(self.conversation_history):
+            content = chunk.content
             print(content, end='')
-            buffer+= content
+            buffer += content
 
         if buffer.strip():
-            assistant_message = {
-                'role': "assistant",
-                "content": buffer
-            }
+            assistant_message = AIMessage(content=buffer)
             self.conversation_history.append(assistant_message)
 
     def run(self):
         print("Chatbot started. Type 'exit' to quit.")
         while True:
             message = self.get_user_input()
-            if message and message["content"].lower() in ["exit", "quit"]:
+            if message and message.content.lower() in ["exit", "quit"]:
                 print("Goodbye!")
                 break
             if message:  # Only send request if input was valid
@@ -117,4 +109,3 @@ if __name__ == "__main__":
         exit(1)
     chat_bot = ChatBot(api_key, model='mistral-large-latest')
     chat_bot.run()
-
