@@ -6,10 +6,11 @@ from pymongo import MongoClient
 load_dotenv()
 
 class ChatBot:
-    def __init__(self, _api_key, model):
+    def __init__(self, _api_key, model,max_history=6 ):
         self.api_key = _api_key
         self.model = model
         self.conversation_history = []
+        self.max_history = max_history
         self.mistral_client = Mistral(api_key = api_key)
         self.db_client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
         self.initialize_context()
@@ -71,7 +72,13 @@ class ChatBot:
             "content": user_input
         }
         self.conversation_history.append(user_message)
+        non_system_messages = [msg for msg in self.conversation_history if msg["role"] != "system"]
+        if len(non_system_messages) > self.max_history:
+            system_message = self.conversation_history[0] if self.conversation_history[0]["role"] == "system" else None
+            trimmed_history = [msg for msg in self.conversation_history if msg["role"] != "system"][-self.max_history:]
+            self.conversation_history = ([system_message] if system_message else []) + trimmed_history
         return user_message
+
 
     def send_request(self):
         stream_response = self.mistral_client.chat.stream(
@@ -116,6 +123,4 @@ if __name__ == "__main__":
         exit(1)
     chat_bot = ChatBot(api_key, model='mistral-large-latest')
     chat_bot.run()
-    # chat_bot_new = ChatBot(api_key, model='mistral-large-latest')
-    # chat_bot_new.run()
 
