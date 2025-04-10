@@ -1,0 +1,7 @@
+python-dotenv
+mistralai
+llamaapi
+google
+openai
+google-genai
+pymongo
