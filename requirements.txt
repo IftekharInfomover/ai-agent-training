@@ -8,3 +8,5 @@ pymongo
 langchain
 langchain-core
 langchain-mistralai
+langchain-community
+pypdf
