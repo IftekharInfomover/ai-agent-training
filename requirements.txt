@@ -10,3 +10,4 @@ langchain-core
 langchain-mistralai
 langchain-community
 pypdf
+langchain_openai

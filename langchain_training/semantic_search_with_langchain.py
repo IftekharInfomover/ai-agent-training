@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 import os
 from langchain_core.vectorstores import InMemoryVectorStore
 import asyncio
+from typing import List
+from langchain_core.documents import Document
+from langchain_core.runnables import chain
 
 
 load_dotenv()
@@ -40,15 +43,60 @@ class SemanticSearch:
         vector_store.add_documents(documents=self.all_splits)
         return  vector_store
 
+
     def similarity_search(self):
         results = self.vector_store.similarity_search(
             "How many distribution centers does Nike have in the US?"
         )
         return results[0]
 
+
     async def perform_search(self):
         results = await self.vector_store.asimilarity_search("When was Nike incorporated?")
         return results[0]
+
+
+    def similarity_search_with_score(self):
+        results = self.vector_store.similarity_search_with_score("What was Nike's revenue in 2023?")
+        doc, score = results[0]
+        print(f"Score: {score}\n")
+        print(doc)
+        pass
+
+
+    def similarity_search_on_embedded_query(self):
+        embedding = self.embeddings.embed_query("How were Nike's margins impacted in 2023?")
+        results = self.vector_store.similarity_search_by_vector(embedding)
+        return results[0]
+
+
+    @chain
+    def retriever(self, query: str) -> List[Document]:
+        return self.vector_store.similarity_search(query, k=1)
+
+
+    def retrieve_by_similarity_search(self):
+        results = self.retriever.batch(
+            [
+                "How many distribution centers does Nike have in the US?",
+                "When was Nike incorporated?",
+            ],
+        )
+        return results
+
+
+    def retrieve_by_vector_store_retriever(self):
+        retriever = self.vector_store.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": 1},
+        )
+        results = retriever.batch(
+            [
+                "How many distribution centers does Nike have in the US?",
+                "When was Nike incorporated?",
+            ],
+        )
+        return results
 
 
 if __name__ == "__main__":
