@@ -11,3 +11,4 @@ langchain-mistralai
 langchain-community
 pypdf
 langchain_openai
+langchain-ollama
